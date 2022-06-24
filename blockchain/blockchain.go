@@ -74,7 +74,7 @@ type Blockchain struct {
 	gpAverage *gasPriceAverage // A reference to the average gas price
 
 	metrics  *Metrics      // Metrics for Prometheus
-	TPSQueue *TPSQueueImpl // Serves TPS calculation
+	tpsQueue *TPSQueueImpl // Serves TPS calculation
 }
 
 // gasPriceAverage keeps track of the average gas price (rolling average)
@@ -200,7 +200,7 @@ func NewBlockchain(
 			count: big.NewInt(0),
 		},
 		metrics: metrics,
-		TPSQueue: &TPSQueueImpl{
+		tpsQueue: &TPSQueueImpl{
 			head:       0,
 			tail:       0,
 			sumTxCount: 0,
@@ -238,7 +238,7 @@ func NewBlockchain(
 	ticker := time.NewTicker(time.Second * 60)
 	go func() {
 		for range ticker.C {
-			b.TPSQueue.pushTxCountPerMinute()
+			b.tpsQueue.pushTxCountPerMinute()
 			b.updateMetrics()
 		}
 	}()
@@ -936,14 +936,14 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	}
 
 	b.logger.Info("new block", logArgs...)
-	b.TPSQueue.AddcurrentTxn(uint64(len(block.Transactions)))
+	b.tpsQueue.addcurrentTxn(uint64(len(block.Transactions)))
 
 	return nil
 }
 
 // updateMetrics will update TPS status
 func (b *Blockchain) updateMetrics() {
-	recentMinute, recentHour := b.TPSQueue.getTPSRecent()
+	recentMinute, recentHour := b.tpsQueue.getTPSRecent()
 	b.metrics.TPSRecentMinute.Set(recentMinute)
 	b.metrics.TPSRecentHour.Set(recentHour)
 }

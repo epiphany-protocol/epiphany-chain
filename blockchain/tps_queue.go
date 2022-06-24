@@ -18,7 +18,7 @@ type TPSQueueImpl struct {
 }
 
 //Add to current transaction count within a minute
-func (q TPSQueueImpl) AddcurrentTxn(count uint64) {
+func (q TPSQueueImpl) addcurrentTxn(count uint64) {
 	q.queueLock.Lock()
 	q.currentTxn += count
 	q.queueLock.Unlock()
