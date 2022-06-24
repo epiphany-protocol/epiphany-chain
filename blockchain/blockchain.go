@@ -943,8 +943,9 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 // updateMetrics will update TPS status
 func (b *Blockchain) updateMetrics() {
-	b.metrics.TPSRecentMinute.Set(b.TPSQueue.getTPSRecentMinute())
-	b.metrics.TPSRecentHour.Set(b.TPSQueue.getTPSRecentHour())
+	recentMinute, recentHour := b.TPSQueue.getTPSRecent()
+	b.metrics.TPSRecentMinute.Set(recentMinute)
+	b.metrics.TPSRecentHour.Set(recentHour)
 }
 
 // extractBlockReceipts extracts the receipts from the passed in block

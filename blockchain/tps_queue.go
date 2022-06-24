@@ -42,18 +42,11 @@ func getNextPos(pos uint8) uint8 {
 	return (pos + 1) % MinutesPerHour
 }
 
-//Calculate TPS in recent minute
-func (q TPSQueueImpl) getTPSRecentMinute() float64 {
+//Calculate TPS in recent minute and hour
+func (q TPSQueueImpl) getTPSRecent() (float64, float64) {
 	q.queueLock.RLock()
-	result := float64(q.recentTxCountPerMinute[q.tail]) / float64(SecondsPerMinute)
+	tpsRecentMinute := float64(q.recentTxCountPerMinute[q.tail]) / float64(SecondsPerMinute)
+	tpsRecentHour := float64(q.sumTxCount) / float64(SecondsPerMinute) / float64(MinutesPerHour)
 	q.queueLock.RUnlock()
-	return result
-}
-
-//Calculate TPS in recent hour
-func (q TPSQueueImpl) getTPSRecentHour() float64 {
-	q.queueLock.RLock()
-	result := float64(q.sumTxCount) / float64(SecondsPerMinute) / float64(MinutesPerHour)
-	q.queueLock.RUnlock()
-	return result
+	return tpsRecentMinute, tpsRecentHour
 }
