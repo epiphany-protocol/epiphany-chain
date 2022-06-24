@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
@@ -71,6 +72,9 @@ type Blockchain struct {
 	stream *eventStream // Event subscriptions
 
 	gpAverage *gasPriceAverage // A reference to the average gas price
+
+	metrics  *Metrics      // Metrics for Prometheus
+	TPSQueue *TPSQueueImpl // Serves TPS calculation
 }
 
 // gasPriceAverage keeps track of the average gas price (rolling average)
@@ -183,6 +187,7 @@ func NewBlockchain(
 	config *chain.Chain,
 	consensus Verifier,
 	executor Executor,
+	metrics *Metrics,
 ) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
@@ -193,6 +198,13 @@ func NewBlockchain(
 		gpAverage: &gasPriceAverage{
 			price: big.NewInt(0),
 			count: big.NewInt(0),
+		},
+		metrics: metrics,
+		TPSQueue: &TPSQueueImpl{
+			head:       0,
+			tail:       0,
+			sumTxCount: 0,
+			currentTxn: 0,
 		},
 	}
 
@@ -222,6 +234,14 @@ func NewBlockchain(
 
 	// Push the initial event to the stream
 	b.stream.push(&Event{})
+
+	ticker := time.NewTicker(time.Second * 60)
+	go func() {
+		for range ticker.C {
+			b.TPSQueue.pushTxCountPerMinute()
+			b.updateMetrics()
+		}
+	}()
 
 	return b, nil
 }
@@ -916,8 +936,15 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	}
 
 	b.logger.Info("new block", logArgs...)
+	b.TPSQueue.AddcurrentTxn(uint64(len(block.Transactions)))
 
 	return nil
+}
+
+// updateMetrics will update TPS status
+func (b *Blockchain) updateMetrics() {
+	b.metrics.TPSRecentMinute.Set(b.TPSQueue.getTPSRecentMinute())
+	b.metrics.TPSRecentHour.Set(b.TPSQueue.getTPSRecentHour())
 }
 
 // extractBlockReceipts extracts the receipts from the passed in block

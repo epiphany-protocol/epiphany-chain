@@ -187,7 +187,7 @@ func NewServer(config *Config) (*Server, error) {
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, m.serverMetrics.blockchain)
 	if err != nil {
 		return nil, err
 	}
