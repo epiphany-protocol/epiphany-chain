@@ -73,8 +73,8 @@ type Blockchain struct {
 
 	gpAverage *gasPriceAverage // A reference to the average gas price
 
-	metrics  *Metrics      // Metrics for Prometheus
-	tpsQueue *TPSQueueImpl // Serves TPS calculation
+	metrics         *Metrics             // Metrics for Prometheus
+	execRecordQueue *ExecRecordQueueImpl // Serves TPS calculation
 }
 
 // gasPriceAverage keeps track of the average gas price (rolling average)
@@ -188,6 +188,7 @@ func NewBlockchain(
 	consensus Verifier,
 	executor Executor,
 	metrics *Metrics,
+	monitorEnabled bool,
 ) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
@@ -200,11 +201,20 @@ func NewBlockchain(
 			count: big.NewInt(0),
 		},
 		metrics: metrics,
-		tpsQueue: &TPSQueueImpl{
-			head:       0,
-			tail:       0,
-			sumTxCount: 0,
-			currentTxn: 0,
+		execRecordQueue: &ExecRecordQueueImpl{
+			head:               0,
+			tail:               0,
+			sumTimePeriodBlock: 0,
+			sumCountBlock:      0,
+			sumTimePeriodTx:    0,
+			sumCountTx:         0,
+			hasPushed:          false,
+			currentExec: &ExecSummary{
+				timePeriodBlock: 0,
+				countBlock:      0,
+				timePeriodTx:    0,
+				countTx:         0,
+			},
 		},
 	}
 
@@ -235,14 +245,14 @@ func NewBlockchain(
 	// Push the initial event to the stream
 	b.stream.push(&Event{})
 
-	ticker := time.NewTicker(time.Second * 60)
-	go func() {
-		for range ticker.C {
-			b.tpsQueue.pushTxCountPerMinute()
-			b.updateMetrics()
-		}
-	}()
-
+	if monitorEnabled {
+		ticker := time.NewTicker(time.Second * 60)
+		go func() {
+			for range ticker.C {
+				b.pushUpdateMetrics()
+			}
+		}()
+	}
 	return b, nil
 }
 
@@ -844,6 +854,7 @@ func (br *BlockResult) verifyBlockResult(referenceBlock *types.Block) error {
 // executeBlockTransactions executes the transactions in the block locally,
 // and reports back the block execution result
 func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult, error) {
+	start := time.Now()
 	header := block.Header
 
 	parent, ok := b.readHeader(header.ParentHash)
@@ -869,6 +880,9 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())
+	elapsed := time.Since(start)
+	b.execRecordQueue.addcurrentExecBlock(uint64(elapsed.Microseconds()))
+	b.execRecordQueue.addcurrentExecTx(uint64(elapsed.Microseconds()), uint64(len(block.Transactions)))
 
 	return &BlockResult{
 		Root:     root,
@@ -936,16 +950,23 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	}
 
 	b.logger.Info("new block", logArgs...)
-	b.tpsQueue.addcurrentTxn(uint64(len(block.Transactions)))
-
 	return nil
+}
+
+func (b *Blockchain) pushUpdateMetrics() {
+	b.execRecordQueue.pushExecPerMinute()
+	b.updateMetrics()
 }
 
 // updateMetrics will update TPS status
 func (b *Blockchain) updateMetrics() {
-	recentMinute, recentHour := b.tpsQueue.getTPSRecent()
-	b.metrics.TPSRecentMinute.Set(recentMinute)
-	b.metrics.TPSRecentHour.Set(recentHour)
+	tpsRecentMinute, tpsRecentHour, avrgBlockPeriodRecent5Min, avrgBlockPeriodRecentHour, avrgTxPeriodRecent5Min, avrgTxPeriodRecentHour := b.execRecordQueue.getMetricsRecent()
+	b.metrics.TPSRecentMinute.Set(tpsRecentMinute)
+	b.metrics.TPSRecentHour.Set(tpsRecentHour)
+	b.metrics.AvrgBlockPeriodRecent5Min.Set(avrgBlockPeriodRecent5Min)
+	b.metrics.AvrgBlockPeriodRecentHour.Set(avrgBlockPeriodRecentHour)
+	b.metrics.AvrgTxPeriodRecent5Min.Set(avrgTxPeriodRecent5Min)
+	b.metrics.AvrgTxPeriodRecentHour.Set(avrgTxPeriodRecentHour)
 }
 
 // extractBlockReceipts extracts the receipts from the passed in block
