@@ -51,7 +51,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	s, _, pastRoot := buildState(c.Pre)
 	forks := config.At(uint64(env.Number))
 
-	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s, hclog.NewNullLogger())
+	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s, hclog.NewNullLogger(), state.NilMetrics())
 	xxx.SetRuntime(precompiled.NewPrecompiled())
 	xxx.SetRuntime(evm.NewEVM())
 

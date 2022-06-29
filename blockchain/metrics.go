@@ -21,6 +21,9 @@ type Metrics struct {
 	AvrgTxPeriodRecent5Min metrics.Gauge
 	//Average transaction execution period in recent hour
 	AvrgTxPeriodRecentHour metrics.Gauge
+
+	//Height of blockchain
+	BlockHeight metrics.Gauge
 }
 
 // GetPrometheusMetrics return the blockchain metrics instance
@@ -68,6 +71,12 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "avrg_tx_period_recent_hour",
 			Help:      "Average transaction execution period in recent hour.",
 		}, labels).With(labelsWithValues...),
+		BlockHeight: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "blockchain",
+			Name:      "block_height",
+			Help:      "Height of blockchain.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
@@ -80,5 +89,6 @@ func NilMetrics() *Metrics {
 		AvrgBlockPeriodRecentHour: discard.NewGauge(),
 		AvrgTxPeriodRecent5Min:    discard.NewGauge(),
 		AvrgTxPeriodRecentHour:    discard.NewGauge(),
+		BlockHeight:               discard.NewGauge(),
 	}
 }

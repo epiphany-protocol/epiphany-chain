@@ -178,7 +178,7 @@ func NewServer(config *Config) (*Server, error) {
 	st := itrie.NewState(stateStorage)
 	m.state = st
 
-	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
+	m.executor = state.NewExecutor(config.Chain.Params, st, logger, m.serverMetrics.state)
 	m.executor.SetRuntime(precompiled.NewPrecompiled())
 	m.executor.SetRuntime(evm.NewEVM())
 

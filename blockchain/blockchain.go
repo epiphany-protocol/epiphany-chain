@@ -967,6 +967,7 @@ func (b *Blockchain) updateMetrics() {
 	b.metrics.AvrgBlockPeriodRecentHour.Set(avrgBlockPeriodRecentHour)
 	b.metrics.AvrgTxPeriodRecent5Min.Set(avrgTxPeriodRecent5Min)
 	b.metrics.AvrgTxPeriodRecentHour.Set(avrgTxPeriodRecentHour)
+	b.metrics.BlockHeight.Set(float64(b.Header().Number))
 }
 
 // extractBlockReceipts extracts the receipts from the passed in block

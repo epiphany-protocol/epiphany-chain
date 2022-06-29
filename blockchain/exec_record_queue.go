@@ -11,9 +11,9 @@ const (
 
 type ExecSummary struct {
 	timePeriodBlock uint64 //microseconds
-	countBlock      uint64
+	countBlock      uint64 //number of blocks
 	timePeriodTx    uint64 //microseconds
-	countTx         uint64
+	countTx         uint64 //number of transactions
 }
 
 //Struct where recent transaction count is stored
