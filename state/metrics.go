@@ -7,15 +7,15 @@ import (
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
-const MaxTxExecPeriod int64 = 2000000
+const MaxTxExecPeriod int64 = 200000
 
-// Metrics represents the txpool metrics
+// Metrics represents the state metrics
 type Metrics struct {
-	// Pending transactions
+	//Number of transactions whose execution period exceeds MaxTxExecPeriod.
 	TxnExceedPeriod metrics.Counter
 }
 
-// GetPrometheusMetrics return the txpool metrics instance
+// GetPrometheusMetrics return the state metrics instance
 func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics {
 	labels := []string{}
 
@@ -33,7 +33,7 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 	}
 }
 
-// NilMetrics will return the non operational txpool metrics
+// NilMetrics will return the non operational state metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
 		TxnExceedPeriod: discard.NewCounter(),
