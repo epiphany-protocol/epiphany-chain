@@ -1006,6 +1006,17 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 			headerTime.Sub(parentTime).Seconds(),
 		)
 	}
+	milliseconds := headerTime.Sub(parentTime).Milliseconds()
+	block_time := i.blockTime.Milliseconds()
+	if milliseconds < block_time+500 {
+		i.metrics.BlockLatencyBelow500ms.Add(1)
+	} else if milliseconds < block_time+1000 {
+		i.metrics.BlockLatencyBelow1s.Add(1)
+	} else if milliseconds < block_time+2000 {
+		i.metrics.BlockLatencyBelow2s.Add(1)
+	} else if milliseconds < block_time+3000 {
+		i.metrics.BlockLatencyBelow3s.Add(1)
+	}
 
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
@@ -1095,6 +1106,7 @@ func (i *Ibft) runRoundChangeState() {
 		i.state.cleanRound(round)
 		// send the round change message
 		i.sendRoundChange()
+		i.metrics.RoundChanges.Add(1)
 	}
 	sendNextRoundChange := func() {
 		sendRoundChange(i.state.view.Round + 1)

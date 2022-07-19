@@ -37,6 +37,7 @@ type JSONRPC struct {
 	logger     hclog.Logger
 	config     *Config
 	dispatcher dispatcher
+	metrics    *Metrics // Metrics for Prometheus
 }
 
 type dispatcher interface {
@@ -61,11 +62,12 @@ type Config struct {
 }
 
 // NewJSONRPC returns the JSONRPC http server
-func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
+func NewJSONRPC(logger hclog.Logger, config *Config, metrics *Metrics) (*JSONRPC, error) {
 	srv := &JSONRPC{
 		logger:     logger.Named("jsonrpc"),
 		config:     config,
 		dispatcher: newDispatcher(logger, config.Store, config.ChainID),
+		metrics:    metrics,
 	}
 
 	// start http server
@@ -237,6 +239,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		"Access-Control-Allow-Headers",
 		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization",
 	)
+	j.metrics.JsonRPCCalls.Add(1)
 
 	if (*req).Method == "OPTIONS" {
 		return

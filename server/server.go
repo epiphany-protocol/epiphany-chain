@@ -552,7 +552,7 @@ func (s *Server) setupJSONRPC() error {
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
 	}
 
-	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
+	srv, err := jsonrpc.NewJSONRPC(s.logger, conf, s.serverMetrics.jsonrpc)
 	if err != nil {
 		return err
 	}
