@@ -24,6 +24,12 @@ type Metrics struct {
 
 	//Height of blockchain
 	BlockHeight metrics.Gauge
+	//Last block execution period
+	BlockPeriod metrics.Gauge
+	//TPS of database
+	TPSDB metrics.Gauge
+	//Database time usage
+	DBPeriod metrics.Gauge
 }
 
 // GetPrometheusMetrics return the blockchain metrics instance
@@ -77,6 +83,24 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "block_height",
 			Help:      "Height of blockchain.",
 		}, labels).With(labelsWithValues...),
+		BlockPeriod: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "blockchain",
+			Name:      "block_period",
+			Help:      "Last block execution period.",
+		}, labels).With(labelsWithValues...),
+		TPSDB: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "blockchain",
+			Name:      "tps_db",
+			Help:      "TPS of database.",
+		}, labels).With(labelsWithValues...),
+		DBPeriod: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "blockchain",
+			Name:      "db_period",
+			Help:      "Time usage of DB persisting blocks.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
@@ -90,5 +114,8 @@ func NilMetrics() *Metrics {
 		AvrgTxPeriodRecent5Min:    discard.NewGauge(),
 		AvrgTxPeriodRecentHour:    discard.NewGauge(),
 		BlockHeight:               discard.NewGauge(),
+		BlockPeriod:               discard.NewGauge(),
+		TPSDB:                     discard.NewGauge(),
+		DBPeriod:                  discard.NewGauge(),
 	}
 }

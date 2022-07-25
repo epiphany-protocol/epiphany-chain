@@ -880,9 +880,10 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())
-	elapsed := time.Since(start)
-	b.execRecordQueue.addcurrentExecBlock(uint64(elapsed.Microseconds()))
-	b.execRecordQueue.addcurrentExecTx(uint64(elapsed.Microseconds()), uint64(len(block.Transactions)))
+	elapsed := time.Since(start).Microseconds()
+	b.metrics.BlockPeriod.Set(float64(elapsed))
+	b.execRecordQueue.addcurrentExecBlock(uint64(elapsed))
+	b.execRecordQueue.addcurrentExecTx(uint64(elapsed), uint64(len(block.Transactions)))
 
 	return &BlockResult{
 		Root:     root,
@@ -905,6 +906,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	header := block.Header
 
+	start := time.Now()
 	if err := b.writeBody(block); err != nil {
 		return err
 	}
@@ -914,6 +916,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
 	}
+	elapsed := time.Since(start).Microseconds()
 
 	// Fetch the block receipts
 	blockReceipts, receiptsErr := b.extractBlockReceipts(block)
@@ -924,9 +927,13 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
+	start = time.Now()
 	if err := b.db.WriteReceipts(block.Hash(), blockReceipts); err != nil {
 		return err
 	}
+	elapsed += time.Since(start).Microseconds()
+	b.metrics.TPSDB.Set(float64(len(block.Transactions)) / float64(elapsed))
+	b.metrics.DBPeriod.Set(float64(elapsed))
 
 	//	update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
