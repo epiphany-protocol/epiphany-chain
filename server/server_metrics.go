@@ -5,6 +5,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 )
@@ -17,6 +18,7 @@ type serverMetrics struct {
 	blockchain *blockchain.Metrics
 	state      *state.Metrics
 	jsonrpc    *jsonrpc.Metrics
+	protocol   *protocol.Metrics
 }
 
 // metricProvider serverMetric instance for the given ChainID and nameSpace
@@ -29,6 +31,7 @@ func metricProvider(nameSpace string, chainID string, metricsRequired bool) *ser
 			blockchain: blockchain.GetPrometheusMetrics(nameSpace, "chain_id", chainID),
 			state:      state.GetPrometheusMetrics(nameSpace, "chain_id", chainID),
 			jsonrpc:    jsonrpc.GetPrometheusMetrics(nameSpace, "chain_id", chainID),
+			protocol:   protocol.GetPrometheusMetrics(nameSpace, "chain_id", chainID),
 		}
 	}
 
@@ -39,5 +42,6 @@ func metricProvider(nameSpace string, chainID string, metricsRequired bool) *ser
 		blockchain: blockchain.NilMetrics(),
 		state:      state.NilMetrics(),
 		jsonrpc:    jsonrpc.NilMetrics(),
+		protocol:   protocol.NilMetrics(),
 	}
 }

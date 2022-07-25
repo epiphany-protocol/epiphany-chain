@@ -47,16 +47,19 @@ type Syncer struct {
 	server *network.Server
 
 	syncProgression *progress.ProgressionWrapper
+
+	metrics *Metrics
 }
 
 // NewSyncer creates a new Syncer instance
-func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim) *Syncer {
+func NewSyncer(logger hclog.Logger, server *network.Server, blockchain blockchainShim, metrics *Metrics) *Syncer {
 	s := &Syncer{
 		logger:          logger.Named("syncer"),
 		stopCh:          make(chan struct{}),
 		blockchain:      blockchain,
 		server:          server,
 		syncProgression: progress.NewProgressionWrapper(progress.ChainSyncBulk),
+		metrics:         metrics,
 	}
 
 	return s
@@ -109,6 +112,8 @@ const syncerV1 = "/syncer/0.1"
 // enqueueBlock adds the specific block to the peerID queue
 func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	s.logger.Debug("enqueue block", "peer", peerID, "number", b.Number(), "hash", b.Hash())
+	eclapsed := uint64(time.Now().Unix()) - b.Header.Timestamp
+	s.metrics.BlockEclapsed.Set(float64(eclapsed))
 
 	peer, exists := s.peers.Load(peerID)
 	if !exists {
