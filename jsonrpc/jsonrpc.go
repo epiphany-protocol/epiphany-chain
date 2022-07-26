@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
@@ -240,6 +241,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization",
 	)
 	j.metrics.JsonRPCCalls.Add(1)
+	start := time.Now()
 
 	if (*req).Method == "OPTIONS" {
 		return
@@ -282,4 +284,6 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	}
 
 	j.logger.Debug("handle", "response", string(resp))
+	elapsed := time.Since(start).Microseconds()
+	j.metrics.JsonRPCCallTime.Set(float64(elapsed))
 }

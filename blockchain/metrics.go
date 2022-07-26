@@ -30,6 +30,9 @@ type Metrics struct {
 	TPSDB metrics.Gauge
 	//Database time usage
 	DBPeriod metrics.Gauge
+
+	//Occured forks
+	Forks metrics.Counter
 }
 
 // GetPrometheusMetrics return the blockchain metrics instance
@@ -101,6 +104,12 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "db_period",
 			Help:      "Time usage of DB persisting blocks.",
 		}, labels).With(labelsWithValues...),
+		Forks: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "blockchain",
+			Name:      "forks",
+			Help:      "Occured forks.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
@@ -117,5 +126,6 @@ func NilMetrics() *Metrics {
 		BlockPeriod:               discard.NewGauge(),
 		TPSDB:                     discard.NewGauge(),
 		DBPeriod:                  discard.NewGauge(),
+		Forks:                     discard.NewCounter(),
 	}
 }

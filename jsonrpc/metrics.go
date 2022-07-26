@@ -11,6 +11,9 @@ import (
 type Metrics struct {
 	//JSONRPC calls
 	JsonRPCCalls metrics.Counter
+
+	//JSONRPC call time period
+	JsonRPCCallTime metrics.Gauge
 }
 
 // GetPrometheusMetrics return the consensus metrics instance
@@ -28,12 +31,19 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "jsonrpc_calls",
 			Help:      "JSONRPC calls.",
 		}, labels).With(labelsWithValues...),
+		JsonRPCCallTime: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "jsonrpc",
+			Name:      "jsonrpc_call_time",
+			Help:      "JSONRPC call time period",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
 // NilMetrics will return the non operational metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
-		JsonRPCCalls: discard.NewCounter(),
+		JsonRPCCalls:    discard.NewCounter(),
+		JsonRPCCallTime: discard.NewGauge(),
 	}
 }

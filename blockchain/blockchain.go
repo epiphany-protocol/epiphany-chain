@@ -1206,7 +1206,7 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 	if err := b.db.WriteForks(newForks); err != nil {
 		return err
 	}
-
+	b.metrics.Forks.Add(1)
 	return nil
 }
 
