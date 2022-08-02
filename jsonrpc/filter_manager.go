@@ -240,9 +240,11 @@ type FilterManager struct {
 
 	updateCh chan struct{}
 	closeCh  chan struct{}
+
+	metrics *Metrics
 }
 
-func NewFilterManager(logger hclog.Logger, store filterManagerStore) *FilterManager {
+func NewFilterManager(logger hclog.Logger, store filterManagerStore, metrics *Metrics) *FilterManager {
 	m := &FilterManager{
 		logger:      logger.Named("filter"),
 		timeout:     defaultTimeout,
@@ -253,6 +255,7 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore) *FilterMana
 		timeouts:    timeHeapImpl{},
 		updateCh:    make(chan struct{}),
 		closeCh:     make(chan struct{}),
+		metrics:     metrics,
 	}
 
 	// start blockstream with the current header
@@ -296,6 +299,7 @@ func (f *FilterManager) Run() {
 			// new blockchain event
 			if err := f.dispatchEvent(evnt); err != nil {
 				f.logger.Error("failed to dispatch event", "err", err)
+				f.metrics.ErrorMessages.Add(1)
 			}
 
 		case <-timeoutCh:
@@ -303,6 +307,7 @@ func (f *FilterManager) Run() {
 			// if filter still exists
 			if filterBase != nil && !f.Uninstall(filterBase.id) {
 				f.logger.Error("failed to uninstall filter", "id", filterBase.id)
+				f.metrics.ErrorMessages.Add(1)
 			}
 
 		case <-f.updateCh:
@@ -598,6 +603,7 @@ func (f *FilterManager) processEvent(evnt *blockchain.Event) error {
 	for _, header := range evnt.OldChain {
 		if processErr := f.appendLogsToFilters(header, true); processErr != nil {
 			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
+			f.metrics.ErrorMessages.Add(1)
 		}
 	}
 
@@ -605,6 +611,7 @@ func (f *FilterManager) processEvent(evnt *blockchain.Event) error {
 	for _, header := range evnt.NewChain {
 		if processErr := f.appendLogsToFilters(header, false); processErr != nil {
 			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
+			f.metrics.ErrorMessages.Add(1)
 		}
 	}
 
@@ -627,7 +634,7 @@ func (f *FilterManager) appendLogsToFilters(header *types.Header, removed bool) 
 	block, ok := f.store.GetBlockByHash(header.Hash, true)
 	if !ok {
 		f.logger.Error("could not find block in store", "hash", header.Hash.String())
-
+		f.metrics.ErrorMessages.Add(1)
 		return nil
 	}
 
@@ -683,6 +690,7 @@ func (f *FilterManager) flushWsFilters() error {
 			}
 
 			f.logger.Error(fmt.Sprintf("Unable to process flush, %v", flushErr))
+			f.metrics.ErrorMessages.Add(1)
 		}
 	}
 

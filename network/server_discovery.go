@@ -4,6 +4,9 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/0xPolygon/polygon-edge/network/grpc"
@@ -12,8 +15,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	kb "github.com/libp2p/go-libp2p-kbucket"
 	rawGrpc "google.golang.org/grpc"
-	"math/big"
-	"time"
 )
 
 var (
@@ -222,6 +223,7 @@ func (s *Server) setupDiscovery() error {
 		s,
 		routingTable,
 		s.logger,
+		s.discoveryMertics,
 	)
 
 	// Register a network event handler

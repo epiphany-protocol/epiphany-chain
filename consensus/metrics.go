@@ -33,6 +33,9 @@ type Metrics struct {
 
 	//Round changes
 	RoundChanges metrics.Counter
+
+	//Error Messages occured
+	ErrorMessages metrics.Counter
 }
 
 // GetPrometheusMetrics return the consensus metrics instance
@@ -104,6 +107,13 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "round_changes",
 			Help:      "Round Changes.",
 		}, labels).With(labelsWithValues...),
+
+		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "consensus",
+			Name:      "error_messages",
+			Help:      "Error Messages occured.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
@@ -119,5 +129,6 @@ func NilMetrics() *Metrics {
 		BlockLatencyBelow2s:    discard.NewCounter(),
 		BlockLatencyBelow3s:    discard.NewCounter(),
 		RoundChanges:           discard.NewCounter(),
+		ErrorMessages:          discard.NewCounter(),
 	}
 }

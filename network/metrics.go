@@ -23,6 +23,9 @@ type Metrics struct {
 
 	// Number of pending inbound connections
 	PendingInboundConnectionsCount metrics.Gauge
+
+	//Error Messages occured
+	ErrorMessages metrics.Counter
 }
 
 // GetPrometheusMetrics return the network metrics instance
@@ -67,6 +70,13 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Subsystem: "network",
 			Name:      "pending_inbound_connections_count",
 			Help:      "Number of pending inbound connections",
+		}, labels).With(labelsWithValues...),
+
+		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "network",
+			Name:      "error_messages",
+			Help:      "Error Messages occured.",
 		}, labels).With(labelsWithValues...),
 	}
 }

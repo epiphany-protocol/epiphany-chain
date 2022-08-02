@@ -22,6 +22,7 @@ type Topic struct {
 	topic   *pubsub.Topic
 	typ     reflect.Type
 	closeCh chan struct{}
+	metrics *Metrics
 }
 
 func (t *Topic) createObj() proto.Message {
@@ -65,7 +66,7 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})
 		msg, err := sub.Next(ctx)
 		if err != nil {
 			t.logger.Error("failed to get topic", "err", err)
-
+			t.metrics.ErrorMessages.Add(1)
 			continue
 		}
 
@@ -73,7 +74,7 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{})
 			obj := t.createObj()
 			if err := proto.Unmarshal(msg.Data, obj); err != nil {
 				t.logger.Error("failed to unmarshal topic", "err", err)
-
+				t.metrics.ErrorMessages.Add(1)
 				return
 			}
 
@@ -89,9 +90,10 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 	}
 
 	tt := &Topic{
-		logger: s.logger.Named(protoID),
-		topic:  topic,
-		typ:    reflect.TypeOf(obj).Elem(),
+		logger:  s.logger.Named(protoID),
+		topic:   topic,
+		typ:     reflect.TypeOf(obj).Elem(),
+		metrics: s.metrics,
 	}
 
 	return tt, nil

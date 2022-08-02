@@ -11,6 +11,9 @@ import (
 type Metrics struct {
 	//JSONRPC calls
 	BlockEclapsed metrics.Gauge
+
+	//Error Messages occured
+	ErrorMessages metrics.Counter
 }
 
 // GetPrometheusMetrics return the consensus metrics instance
@@ -28,6 +31,12 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "block_eclapsed",
 			Help:      "Time eclapsed from block creation to received.",
 		}, labels).With(labelsWithValues...),
+		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "protocol",
+			Name:      "error_messages",
+			Help:      "Error Messages occured.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
@@ -35,5 +44,6 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
 		BlockEclapsed: discard.NewGauge(),
+		ErrorMessages: discard.NewCounter(),
 	}
 }

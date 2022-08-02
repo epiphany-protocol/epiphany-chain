@@ -120,6 +120,7 @@ func (e *Executor) ProcessBlock(
 		}
 
 		if err != nil {
+			e.metrics.ErrorMessages.Add(1)
 			return nil, err
 		}
 	}

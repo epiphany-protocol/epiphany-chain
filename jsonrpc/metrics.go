@@ -14,6 +14,9 @@ type Metrics struct {
 
 	//JSONRPC call time period
 	JsonRPCCallTime metrics.Gauge
+
+	//Error Messages occured
+	ErrorMessages metrics.Counter
 }
 
 // GetPrometheusMetrics return the consensus metrics instance
@@ -37,6 +40,12 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "jsonrpc_call_time",
 			Help:      "JSONRPC call time period",
 		}, labels).With(labelsWithValues...),
+		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "jsonrpc",
+			Name:      "error_messages",
+			Help:      "Error Messages occured.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
@@ -45,5 +54,6 @@ func NilMetrics() *Metrics {
 	return &Metrics{
 		JsonRPCCalls:    discard.NewCounter(),
 		JsonRPCCallTime: discard.NewGauge(),
+		ErrorMessages:   discard.NewCounter(),
 	}
 }

@@ -118,14 +118,14 @@ func (s *Syncer) enqueueBlock(peerID peer.ID, b *types.Block) {
 	peer, exists := s.peers.Load(peerID)
 	if !exists {
 		s.logger.Error("enqueue block: peer not present", "id", peerID.String())
-
+		s.metrics.ErrorMessages.Add(1)
 		return
 	}
 
 	syncPeer, ok := peer.(*SyncPeer)
 	if !ok {
 		s.logger.Error("invalid sync peer type cast")
-
+		s.metrics.ErrorMessages.Add(1)
 		return
 	}
 
@@ -149,7 +149,7 @@ func (s *Syncer) updatePeerStatus(peerID peer.ID, status *Status) {
 		syncPeer, ok := peer.(*SyncPeer)
 		if !ok {
 			s.logger.Error("invalid sync peer type cast")
-
+			s.metrics.ErrorMessages.Add(1)
 			return
 		}
 
@@ -164,7 +164,7 @@ func (s *Syncer) Broadcast(b *types.Block) {
 	if !ok {
 		// not supposed to happen
 		s.logger.Error("total difficulty not found", "block number", b.Number())
-
+		s.metrics.ErrorMessages.Add(1)
 		return
 	}
 
@@ -192,6 +192,7 @@ func (s *Syncer) notifyPeers(req *proto.NotifyReq) {
 		startTime := time.Now()
 		if _, err := syncPeer.client.Notify(context.Background(), req); err != nil {
 			s.logger.Error("failed to notify", "err", err)
+			s.metrics.ErrorMessages.Add(1)
 		}
 
 		duration := time.Since(startTime)
@@ -239,6 +240,7 @@ func (s *Syncer) setupPeers() {
 	for _, p := range s.server.Peers() {
 		if addErr := s.AddPeer(p.Info.ID); addErr != nil {
 			s.logger.Error(fmt.Sprintf("Error when adding peer [%s], %v", p.Info.ID, addErr))
+			s.metrics.ErrorMessages.Add(1)
 		}
 	}
 }
@@ -248,7 +250,7 @@ func (s *Syncer) handlePeerEvent() {
 	updateCh, err := s.server.SubscribeCh()
 	if err != nil {
 		s.logger.Error("failed to subscribe", "err", err)
-
+		s.metrics.ErrorMessages.Add(1)
 		return
 	}
 
@@ -263,10 +265,12 @@ func (s *Syncer) handlePeerEvent() {
 			case event.PeerConnected:
 				if err := s.AddPeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to add peer", "err", err)
+					s.metrics.ErrorMessages.Add(1)
 				}
 			case event.PeerDisconnected:
 				if err := s.DeletePeer(evnt.PeerID); err != nil {
 					s.logger.Error("failed to delete user", "err", err)
+					s.metrics.ErrorMessages.Add(1)
 				}
 			}
 		}
@@ -387,13 +391,13 @@ func (s *Syncer) WatchSyncWithPeer(p *SyncPeer, newBlockHandler func(b *types.Bl
 
 		if err := s.blockchain.VerifyFinalizedBlock(b); err != nil {
 			s.logger.Error("unable to verify block, %w", err)
-
+			s.metrics.ErrorMessages.Add(1)
 			return
 		}
 
 		if err := s.blockchain.WriteBlock(b); err != nil {
 			s.logger.Error("failed to write block", "err", err)
-
+			s.metrics.ErrorMessages.Add(1)
 			break
 		}
 

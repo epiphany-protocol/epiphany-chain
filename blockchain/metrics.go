@@ -33,6 +33,9 @@ type Metrics struct {
 
 	//Occured forks
 	Forks metrics.Counter
+
+	//Error Messages occured
+	ErrorMessages metrics.Counter
 }
 
 // GetPrometheusMetrics return the blockchain metrics instance
@@ -110,6 +113,12 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "forks",
 			Help:      "Occured forks.",
 		}, labels).With(labelsWithValues...),
+		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "blockchain",
+			Name:      "error_messages",
+			Help:      "Error Messages occured.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
@@ -127,5 +136,6 @@ func NilMetrics() *Metrics {
 		TPSDB:                     discard.NewGauge(),
 		DBPeriod:                  discard.NewGauge(),
 		Forks:                     discard.NewCounter(),
+		ErrorMessages:             discard.NewCounter(),
 	}
 }

@@ -227,7 +227,7 @@ func saveSnapshots(t *testing.T, path string, snapshots []*Snapshot) {
 		return
 	}
 
-	store := newSnapshotStore()
+	store := newSnapshotStore(consensus.NilMetrics())
 	for _, snap := range snapshots {
 		store.add(snap)
 	}
@@ -836,7 +836,7 @@ func TestSnapshot_PurgeSnapshots(t *testing.T) {
 
 func TestSnapshot_Store_SaveLoad(t *testing.T) {
 	tmpDir := getTempDir(t)
-	store0 := newSnapshotStore()
+	store0 := newSnapshotStore(consensus.NilMetrics())
 
 	for i := 0; i < 10; i++ {
 		store0.add(&Snapshot{
@@ -845,14 +845,14 @@ func TestSnapshot_Store_SaveLoad(t *testing.T) {
 	}
 	assert.NoError(t, store0.saveToPath(tmpDir))
 
-	store1 := newSnapshotStore()
+	store1 := newSnapshotStore(consensus.NilMetrics())
 	assert.NoError(t, store1.loadFromPath(tmpDir, hclog.NewNullLogger()))
 
 	assert.Equal(t, store0, store1)
 }
 
 func TestSnapshot_Store_Find(t *testing.T) {
-	store := newSnapshotStore()
+	store := newSnapshotStore(consensus.NilMetrics())
 
 	for i := 0; i <= 100; i++ {
 		if i%10 == 0 {

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p-core/network"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/network/proto"
@@ -91,6 +92,7 @@ type DiscoveryService struct {
 	routingTable *kb.RoutingTable // Kademlia 'k-bucket' routing table that contains connected nodes info
 
 	closeCh chan struct{} // Channel used for stopping the DiscoveryService
+	metrics *Metrics
 }
 
 // NewDiscoveryService creates a new instance of the discovery service
@@ -98,12 +100,14 @@ func NewDiscoveryService(
 	server networkingServer,
 	routingTable *kb.RoutingTable,
 	logger hclog.Logger,
+	metrics *Metrics,
 ) *DiscoveryService {
 	return &DiscoveryService{
 		logger:       logger.Named("discovery"),
 		baseServer:   server,
 		routingTable: routingTable,
 		closeCh:      make(chan struct{}),
+		metrics:      metrics,
 	}
 }
 
@@ -137,7 +141,7 @@ func (d *DiscoveryService) HandleNetworkEvent(peerEvent *event.PeerEvent) {
 		_, err := d.routingTable.TryAddPeer(peerID, false, false)
 		if err != nil {
 			d.logger.Error("failed to add peer to routing table", "err", err)
-
+			d.metrics.ErrorMessages.Add(1)
 			return
 		}
 	case event.PeerDisconnected, event.PeerFailedToConnect:
@@ -158,6 +162,7 @@ func (d *DiscoveryService) ConnectToBootnodes(bootnodes []*peer.AddrInfo) {
 				"err",
 				err,
 			)
+			d.metrics.ErrorMessages.Add(1)
 		}
 	}
 }
@@ -196,7 +201,7 @@ func (d *DiscoveryService) addPeersToTable(nodeAddrStrs []string) {
 				"err",
 				err,
 			)
-
+			d.metrics.ErrorMessages.Add(1)
 			continue
 		}
 
@@ -208,6 +213,7 @@ func (d *DiscoveryService) addPeersToTable(nodeAddrStrs []string) {
 				"err",
 				err,
 			)
+			d.metrics.ErrorMessages.Add(1)
 		}
 	}
 }
@@ -308,6 +314,7 @@ func (d *DiscoveryService) regularPeerDiscovery() {
 			"err",
 			err,
 		)
+		d.metrics.ErrorMessages.Add(1)
 	}
 }
 
@@ -364,7 +371,7 @@ func (d *DiscoveryService) bootnodePeerDiscovery() {
 	foundNodes, err := d.findPeersCall(bootnode.ID, true)
 	if err != nil {
 		d.logger.Error("Unable to execute bootnode peer discovery, %w", err)
-
+		d.metrics.ErrorMessages.Add(1)
 		return
 	}
 

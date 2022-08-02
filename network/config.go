@@ -1,10 +1,12 @@
 package network
 
 import (
+	"net"
+
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/multiformats/go-multiaddr"
-	"net"
 )
 
 // Config details the params for the base networking server
@@ -20,6 +22,7 @@ type Config struct {
 	Chain            *chain.Chain           // the reference to the chain configuration
 	SecretsManager   secrets.SecretsManager // the secrets manager used for key storage
 	Metrics          *Metrics               // the metrics reporting reference
+	DiscoveryMetrics *discovery.Metrics
 }
 
 func DefaultConfig() *Config {

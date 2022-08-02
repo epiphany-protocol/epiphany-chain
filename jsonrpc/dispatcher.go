@@ -44,16 +44,18 @@ type Dispatcher struct {
 	filterManager *FilterManager
 	endpoints     endpoints
 	chainID       uint64
+	metrics       *Metrics
 }
 
-func newDispatcher(logger hclog.Logger, store JSONRPCStore, chainID uint64) *Dispatcher {
+func newDispatcher(logger hclog.Logger, store JSONRPCStore, chainID uint64, metrics *Metrics) *Dispatcher {
 	d := &Dispatcher{
 		logger:  logger.Named("dispatcher"),
 		chainID: chainID,
+		metrics: metrics,
 	}
 
 	if store != nil {
-		d.filterManager = NewFilterManager(logger, store)
+		d.filterManager = NewFilterManager(logger, store, metrics)
 		go d.filterManager.Run()
 	}
 
@@ -319,6 +321,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 
 func (d *Dispatcher) logInternalError(method string, err error) {
 	d.logger.Error("failed to dispatch", "method", method, "err", err)
+	d.metrics.ErrorMessages.Add(1)
 }
 
 func (d *Dispatcher) registerService(serviceName string, service interface{}) {

@@ -1,4 +1,4 @@
-package state
+package backup
 
 import (
 	"github.com/go-kit/kit/metrics"
@@ -7,18 +7,13 @@ import (
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
-const MaxTxExecPeriod int64 = 200000
-
-// Metrics represents the state metrics
+// Metrics represents the consensus metrics
 type Metrics struct {
-	//Number of transactions whose execution period exceeds MaxTxExecPeriod.
-	TxnExceedPeriod metrics.Counter
-
 	//Error Messages occured
 	ErrorMessages metrics.Counter
 }
 
-// GetPrometheusMetrics return the state metrics instance
+// GetPrometheusMetrics return the consensus metrics instance
 func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics {
 	labels := []string{}
 
@@ -27,25 +22,18 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 	}
 
 	return &Metrics{
-		TxnExceedPeriod: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: "state",
-			Name:      "txn_exceed_period",
-			Help:      "Number of transactions whose execution period exceeds MaxTxExecPeriod.",
-		}, labels).With(labelsWithValues...),
 		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: "state",
+			Subsystem: "backup",
 			Name:      "error_messages",
 			Help:      "Error Messages occured.",
 		}, labels).With(labelsWithValues...),
 	}
 }
 
-// NilMetrics will return the non operational state metrics
+// NilMetrics will return the non operational metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
-		TxnExceedPeriod: discard.NewCounter(),
-		ErrorMessages:   discard.NewCounter(),
+		ErrorMessages: discard.NewCounter(),
 	}
 }

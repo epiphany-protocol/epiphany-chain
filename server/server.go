@@ -159,6 +159,7 @@ func NewServer(config *Config) (*Server, error) {
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 		netConfig.SecretsManager = m.secretsManager
 		netConfig.Metrics = m.serverMetrics.network
+		netConfig.DiscoveryMetrics = m.serverMetrics.discovery
 
 		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
@@ -575,6 +576,7 @@ func (s *Server) setupGRPC() error {
 	go func() {
 		if err := s.grpcServer.Serve(lis); err != nil {
 			s.logger.Error(err.Error())
+			s.serverMetrics.server.ErrorMessages.Add(1)
 		}
 	}()
 
@@ -598,26 +600,31 @@ func (s *Server) Close() {
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
 		s.logger.Error("failed to close blockchain", "err", err.Error())
+		s.serverMetrics.server.ErrorMessages.Add(1)
 	}
 
 	// Close the networking layer
 	if err := s.network.Close(); err != nil {
 		s.logger.Error("failed to close networking", "err", err.Error())
+		s.serverMetrics.server.ErrorMessages.Add(1)
 	}
 
 	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
 		s.logger.Error("failed to close consensus", "err", err.Error())
+		s.serverMetrics.server.ErrorMessages.Add(1)
 	}
 
 	// Close the state storage
 	if err := s.stateStorage.Close(); err != nil {
 		s.logger.Error("failed to close storage for trie", "err", err.Error())
+		s.serverMetrics.server.ErrorMessages.Add(1)
 	}
 
 	if s.prometheusServer != nil {
 		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {
 			s.logger.Error("Prometheus server shutdown error", err)
+			s.serverMetrics.server.ErrorMessages.Add(1)
 		}
 	}
 
@@ -647,6 +654,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+			s.serverMetrics.server.ErrorMessages.Add(1)
 		}
 	}()
 

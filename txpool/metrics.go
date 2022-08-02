@@ -11,6 +11,9 @@ import (
 type Metrics struct {
 	// Pending transactions
 	PendingTxs metrics.Gauge
+
+	//Error Messages occured
+	ErrorMessages metrics.Counter
 }
 
 // GetPrometheusMetrics return the txpool metrics instance
@@ -28,12 +31,19 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "pending_transactions",
 			Help:      "Pending transactions in the pool",
 		}, labels).With(labelsWithValues...),
+		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "txpool",
+			Name:      "error_messages",
+			Help:      "Error Messages occured.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
 // NilMetrics will return the non operational txpool metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
-		PendingTxs: discard.NewGauge(),
+		PendingTxs:    discard.NewGauge(),
+		ErrorMessages: discard.NewCounter(),
 	}
 }

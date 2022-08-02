@@ -595,7 +595,7 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 	bb, err := b.db.ReadBody(hash)
 	if err != nil {
 		b.logger.Error("failed to read body", "err", err)
-
+		b.metrics.ErrorMessages.Add(1)
 		return nil, false
 	}
 
@@ -750,7 +750,7 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 			childBlock.Number(),
 			parentHash,
 		))
-
+		b.metrics.ErrorMessages.Add(1)
 		return ErrParentNotFound
 	}
 
@@ -771,7 +771,7 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 			childBlock.Number(),
 			parent.Number,
 		))
-
+		b.metrics.ErrorMessages.Add(1)
 		return ErrInvalidBlockSequence
 	}
 
@@ -795,7 +795,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 			hash,
 			block.Header.Sha3Uncles,
 		))
-
+		b.metrics.ErrorMessages.Add(1)
 		return ErrInvalidSha3Uncles
 	}
 
@@ -806,7 +806,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 			hash,
 			block.Header.TxRoot,
 		))
-
+		b.metrics.ErrorMessages.Add(1)
 		return ErrInvalidTxRoot
 	}
 
