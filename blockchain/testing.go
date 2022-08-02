@@ -3,10 +3,10 @@ package blockchain
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
@@ -22,6 +22,7 @@ var (
 
 var (
 	errInvalidTypeAssertion = errors.New("invalid type assertion")
+	nilMetrics              = NilMetrics()
 )
 
 // NewTestHeadersWithSeed creates a new chain with a seed factor
@@ -106,7 +107,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	}
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
-	b, err := newBlockChain(config, state.NewExecutor(config.Params, st, hclog.NewNullLogger()))
+	b, err := newBlockChain(config, state.NewExecutor(config.Params, st, hclog.NewNullLogger(), state.NilMetrics()))
 
 	if err != nil {
 		t.Fatal(err)
@@ -329,7 +330,7 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 		executor = &mockExecutor{}
 	}
 
-	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor)
+	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor, nilMetrics, true)
 	if err != nil {
 		return nil, err
 	}

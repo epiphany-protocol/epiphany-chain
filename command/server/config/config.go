@@ -29,6 +29,7 @@ type Config struct {
 	BlockTime         uint64     `json:"block_time_s" yaml:"block_time_s"`
 	Headers           *Headers   `json:"headers" yaml:"headers"`
 	LogFilePath       string     `json:"log_to" yaml:"log_to"`
+	MonitorEnabled    bool       `json:"monitor_enabled" yaml:"monitor_enabled"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -91,7 +92,8 @@ func DefaultConfig() *Config {
 		Headers: &Headers{
 			AccessControlAllowOrigins: []string{"*"},
 		},
-		LogFilePath: "",
+		LogFilePath:    "",
+		MonitorEnabled: true,
 	}
 }
 

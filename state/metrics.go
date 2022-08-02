@@ -1,4 +1,4 @@
-package txpool
+package state
 
 import (
 	"github.com/go-kit/kit/metrics"
@@ -7,16 +7,18 @@ import (
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
-// Metrics represents the txpool metrics
+const MaxTxExecPeriod int64 = 200000
+
+// Metrics represents the state metrics
 type Metrics struct {
-	// Pending transactions
-	PendingTxs metrics.Gauge
+	//Number of transactions whose execution period exceeds MaxTxExecPeriod.
+	TxnExceedPeriod metrics.Counter
 
 	//Error Messages occured
 	ErrorMessages metrics.Counter
 }
 
-// GetPrometheusMetrics return the txpool metrics instance
+// GetPrometheusMetrics return the state metrics instance
 func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics {
 	labels := []string{}
 
@@ -25,25 +27,25 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 	}
 
 	return &Metrics{
-		PendingTxs: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+		TxnExceedPeriod: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: "txpool",
-			Name:      "pending_transactions",
-			Help:      "Pending transactions in the pool",
+			Subsystem: "state",
+			Name:      "txn_exceed_period",
+			Help:      "Number of transactions whose execution period exceeds MaxTxExecPeriod.",
 		}, labels).With(labelsWithValues...),
 		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: "txpool",
+			Subsystem: "state",
 			Name:      "error_messages",
 			Help:      "Error Messages occured.",
 		}, labels).With(labelsWithValues...),
 	}
 }
 
-// NilMetrics will return the non operational txpool metrics
+// NilMetrics will return the non operational state metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
-		PendingTxs:    discard.NewGauge(),
-		ErrorMessages: discard.NewCounter(),
+		TxnExceedPeriod: discard.NewCounter(),
+		ErrorMessages:   discard.NewCounter(),
 	}
 }

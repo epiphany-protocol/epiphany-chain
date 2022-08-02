@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
@@ -71,6 +72,9 @@ type Blockchain struct {
 	stream *eventStream // Event subscriptions
 
 	gpAverage *gasPriceAverage // A reference to the average gas price
+
+	metrics         *Metrics             // Metrics for Prometheus
+	execRecordQueue *ExecRecordQueueImpl // Serves TPS calculation
 }
 
 // gasPriceAverage keeps track of the average gas price (rolling average)
@@ -183,6 +187,8 @@ func NewBlockchain(
 	config *chain.Chain,
 	consensus Verifier,
 	executor Executor,
+	metrics *Metrics,
+	monitorEnabled bool,
 ) (*Blockchain, error) {
 	b := &Blockchain{
 		logger:    logger.Named("blockchain"),
@@ -193,6 +199,22 @@ func NewBlockchain(
 		gpAverage: &gasPriceAverage{
 			price: big.NewInt(0),
 			count: big.NewInt(0),
+		},
+		metrics: metrics,
+		execRecordQueue: &ExecRecordQueueImpl{
+			head:               0,
+			tail:               0,
+			sumTimePeriodBlock: 0,
+			sumCountBlock:      0,
+			sumTimePeriodTx:    0,
+			sumCountTx:         0,
+			hasPushed:          false,
+			currentExec: &ExecSummary{
+				timePeriodBlock: 0,
+				countBlock:      0,
+				timePeriodTx:    0,
+				countTx:         0,
+			},
 		},
 	}
 
@@ -223,6 +245,14 @@ func NewBlockchain(
 	// Push the initial event to the stream
 	b.stream.push(&Event{})
 
+	if monitorEnabled {
+		ticker := time.NewTicker(time.Second * 60)
+		go func() {
+			for range ticker.C {
+				b.pushUpdateMetrics()
+			}
+		}()
+	}
 	return b, nil
 }
 
@@ -565,7 +595,7 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 	bb, err := b.db.ReadBody(hash)
 	if err != nil {
 		b.logger.Error("failed to read body", "err", err)
-
+		b.metrics.ErrorMessages.Add(1)
 		return nil, false
 	}
 
@@ -720,7 +750,7 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 			childBlock.Number(),
 			parentHash,
 		))
-
+		b.metrics.ErrorMessages.Add(1)
 		return ErrParentNotFound
 	}
 
@@ -741,7 +771,7 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 			childBlock.Number(),
 			parent.Number,
 		))
-
+		b.metrics.ErrorMessages.Add(1)
 		return ErrInvalidBlockSequence
 	}
 
@@ -765,7 +795,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 			hash,
 			block.Header.Sha3Uncles,
 		))
-
+		b.metrics.ErrorMessages.Add(1)
 		return ErrInvalidSha3Uncles
 	}
 
@@ -776,7 +806,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 			hash,
 			block.Header.TxRoot,
 		))
-
+		b.metrics.ErrorMessages.Add(1)
 		return ErrInvalidTxRoot
 	}
 
@@ -824,6 +854,7 @@ func (br *BlockResult) verifyBlockResult(referenceBlock *types.Block) error {
 // executeBlockTransactions executes the transactions in the block locally,
 // and reports back the block execution result
 func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult, error) {
+	start := time.Now()
 	header := block.Header
 
 	parent, ok := b.readHeader(header.ParentHash)
@@ -849,6 +880,10 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())
+	elapsed := time.Since(start).Microseconds()
+	b.metrics.BlockPeriod.Set(float64(elapsed))
+	b.execRecordQueue.addcurrentExecBlock(uint64(elapsed))
+	b.execRecordQueue.addcurrentExecTx(uint64(elapsed), uint64(len(block.Transactions)))
 
 	return &BlockResult{
 		Root:     root,
@@ -871,6 +906,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 
 	header := block.Header
 
+	start := time.Now()
 	if err := b.writeBody(block); err != nil {
 		return err
 	}
@@ -880,6 +916,7 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
 	}
+	elapsed := time.Since(start).Microseconds()
 
 	// Fetch the block receipts
 	blockReceipts, receiptsErr := b.extractBlockReceipts(block)
@@ -890,9 +927,13 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
+	start = time.Now()
 	if err := b.db.WriteReceipts(block.Hash(), blockReceipts); err != nil {
 		return err
 	}
+	elapsed += time.Since(start).Microseconds()
+	b.metrics.TPSDB.Set(float64(len(block.Transactions)) / float64(elapsed))
+	b.metrics.DBPeriod.Set(float64(elapsed))
 
 	//	update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -916,8 +957,24 @@ func (b *Blockchain) WriteBlock(block *types.Block) error {
 	}
 
 	b.logger.Info("new block", logArgs...)
-
 	return nil
+}
+
+func (b *Blockchain) pushUpdateMetrics() {
+	b.execRecordQueue.pushExecPerMinute()
+	b.updateMetrics()
+}
+
+// updateMetrics will update TPS status
+func (b *Blockchain) updateMetrics() {
+	tpsRecentMinute, tpsRecentHour, avrgBlockPeriodRecent5Min, avrgBlockPeriodRecentHour, avrgTxPeriodRecent5Min, avrgTxPeriodRecentHour := b.execRecordQueue.getMetricsRecent()
+	b.metrics.TPSRecentMinute.Set(tpsRecentMinute)
+	b.metrics.TPSRecentHour.Set(tpsRecentHour)
+	b.metrics.AvrgBlockPeriodRecent5Min.Set(avrgBlockPeriodRecent5Min)
+	b.metrics.AvrgBlockPeriodRecentHour.Set(avrgBlockPeriodRecentHour)
+	b.metrics.AvrgTxPeriodRecent5Min.Set(avrgTxPeriodRecent5Min)
+	b.metrics.AvrgTxPeriodRecentHour.Set(avrgTxPeriodRecentHour)
+	b.metrics.BlockHeight.Set(float64(b.Header().Number))
 }
 
 // extractBlockReceipts extracts the receipts from the passed in block
@@ -1149,7 +1206,7 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 	if err := b.db.WriteForks(newForks); err != nil {
 		return err
 	}
-
+	b.metrics.Forks.Add(1)
 	return nil
 }
 

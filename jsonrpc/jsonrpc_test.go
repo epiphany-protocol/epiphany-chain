@@ -1,9 +1,10 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"net"
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -20,7 +21,7 @@ func TestHTTPServer(t *testing.T) {
 		Store: store,
 		Addr:  &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
-	_, err := NewJSONRPC(hclog.NewNullLogger(), config)
+	_, err := NewJSONRPC(hclog.NewNullLogger(), config, NilMetrics())
 
 	if err != nil {
 		t.Fatal(err)

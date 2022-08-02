@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
@@ -37,6 +38,7 @@ type JSONRPC struct {
 	logger     hclog.Logger
 	config     *Config
 	dispatcher dispatcher
+	metrics    *Metrics // Metrics for Prometheus
 }
 
 type dispatcher interface {
@@ -61,11 +63,12 @@ type Config struct {
 }
 
 // NewJSONRPC returns the JSONRPC http server
-func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
+func NewJSONRPC(logger hclog.Logger, config *Config, metrics *Metrics) (*JSONRPC, error) {
 	srv := &JSONRPC{
 		logger:     logger.Named("jsonrpc"),
 		config:     config,
-		dispatcher: newDispatcher(logger, config.Store, config.ChainID),
+		dispatcher: newDispatcher(logger, config.Store, config.ChainID, metrics),
+		metrics:    metrics,
 	}
 
 	// start http server
@@ -99,6 +102,7 @@ func (j *JSONRPC) setupHTTP() error {
 	go func() {
 		if err := srv.Serve(lis); err != nil {
 			j.logger.Error("closed http connection", "err", err)
+			j.metrics.ErrorMessages.Add(1)
 		}
 	}()
 
@@ -144,6 +148,7 @@ type wsWrapper struct {
 	ws        *websocket.Conn // the actual WS connection
 	logger    hclog.Logger    // module logger
 	writeLock sync.Mutex      // writer lock
+	metrics   *Metrics
 }
 
 // WriteMessage writes out the message to the WS peer
@@ -156,6 +161,7 @@ func (w *wsWrapper) WriteMessage(messageType int, data []byte) error {
 		w.logger.Error(
 			fmt.Sprintf("Unable to write WS message, %s", writeErr.Error()),
 		)
+		w.metrics.ErrorMessages.Add(1)
 	}
 
 	return writeErr
@@ -175,7 +181,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 	ws, err := wsUpgrader.Upgrade(w, req, nil)
 	if err != nil {
 		j.logger.Error(fmt.Sprintf("Unable to upgrade to a WS connection, %s", err.Error()))
-
+		j.metrics.ErrorMessages.Add(1)
 		return
 	}
 
@@ -186,10 +192,11 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 			j.logger.Error(
 				fmt.Sprintf("Unable to gracefully close WS connection, %s", err.Error()),
 			)
+			j.metrics.ErrorMessages.Add(1)
 		}
 	}(ws)
 
-	wrapConn := &wsWrapper{ws: ws, logger: j.logger}
+	wrapConn := &wsWrapper{ws: ws, logger: j.logger, metrics: j.metrics}
 
 	j.logger.Info("Websocket connection established")
 	// Run the listen loop
@@ -207,6 +214,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 			} else {
 				j.logger.Error(fmt.Sprintf("Unable to read WS message, %s", err.Error()))
 				j.logger.Info("Closing WS connection with error")
+				j.metrics.ErrorMessages.Add(1)
 			}
 
 			break
@@ -217,7 +225,7 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 				resp, handleErr := j.dispatcher.HandleWs(message, wrapConn)
 				if handleErr != nil {
 					j.logger.Error(fmt.Sprintf("Unable to handle WS request, %s", handleErr.Error()))
-
+					j.metrics.ErrorMessages.Add(1)
 					_ = wrapConn.WriteMessage(
 						msgType,
 						[]byte(fmt.Sprintf("WS Handle error: %s", handleErr.Error())),
@@ -237,6 +245,8 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 		"Access-Control-Allow-Headers",
 		"Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization",
 	)
+	j.metrics.JsonRPCCalls.Add(1)
+	start := time.Now()
 
 	if (*req).Method == "OPTIONS" {
 		return
@@ -279,4 +289,6 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 	}
 
 	j.logger.Debug("handle", "response", string(resp))
+	elapsed := time.Since(start).Microseconds()
+	j.metrics.JsonRPCCallTime.Set(float64(elapsed))
 }

@@ -3,11 +3,12 @@ package protocol
 import (
 	"context"
 	"errors"
-	"github.com/0xPolygon/polygon-edge/protocol/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/protocol/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -553,7 +554,7 @@ func createSyncers(count int, servers []*network.Server, blockStores []*mockBloc
 	syncers := make([]*Syncer, count)
 
 	for indx := 0; indx < count; indx++ {
-		syncers[indx] = NewSyncer(hclog.NewNullLogger(), servers[indx], blockStores[indx])
+		syncers[indx] = NewSyncer(hclog.NewNullLogger(), servers[indx], blockStores[indx], NilMetrics())
 	}
 
 	return syncers

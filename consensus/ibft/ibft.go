@@ -187,7 +187,7 @@ func Factory(
 	// Istanbul requires a different header hash function
 	types.HeaderHash = istanbulHeaderHash
 
-	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain)
+	p.syncer = protocol.NewSyncer(params.Logger, params.Network, params.Blockchain, params.ProtocolMetrics)
 
 	return p, nil
 }
@@ -326,7 +326,7 @@ func (i *Ibft) setupTransport() error {
 		msg, ok := obj.(*proto.MessageReq)
 		if !ok {
 			i.logger.Error("invalid type assertion for message request")
-
+			i.metrics.ErrorMessages.Add(1)
 			return
 		}
 
@@ -339,7 +339,7 @@ func (i *Ibft) setupTransport() error {
 		// decode sender
 		if err := validateMsg(msg); err != nil {
 			i.logger.Error("failed to validate msg", "err", err)
-
+			i.metrics.ErrorMessages.Add(1)
 			return
 		}
 
@@ -479,6 +479,7 @@ func (i *Ibft) runSyncState() {
 	callInsertBlockHook := func(blockNumber uint64) {
 		if hookErr := i.runHook(InsertBlockHook, blockNumber, blockNumber); hookErr != nil {
 			i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", InsertBlockHook, hookErr))
+			i.metrics.ErrorMessages.Add(1)
 		}
 	}
 
@@ -515,7 +516,7 @@ func (i *Ibft) runSyncState() {
 			i.txpool.ResetWithHeaders(newBlock.Header)
 		}); err != nil {
 			i.logger.Error("failed to bulk sync", "err", err)
-
+			i.metrics.ErrorMessages.Add(1)
 			continue
 		}
 
@@ -605,6 +606,7 @@ func (i *Ibft) buildBlock(snap *Snapshot, parent *types.Header) (*types.Block, e
 		snap:   snap,
 	}); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CandidateVoteHook, hookErr))
+		i.metrics.ErrorMessages.Add(1)
 	}
 
 	// set the timestamp
@@ -702,6 +704,7 @@ func (i *Ibft) writeTransactions(gasLimit uint64, transition transitionInterface
 		}
 
 		if err := transition.Write(tx); err != nil {
+			i.metrics.ErrorMessages.Add(1)
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
@@ -748,7 +751,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	if number != i.state.view.Sequence {
 		i.logger.Error("sequence not correct", "parent", parent.Number, "sequence", i.state.view.Sequence)
 		i.setState(SyncState)
-
+		i.metrics.ErrorMessages.Add(1)
 		return
 	}
 
@@ -757,7 +760,7 @@ func (i *Ibft) runAcceptState() { // start new round
 	if err != nil {
 		i.logger.Error("cannot find snapshot", "num", parent.Number)
 		i.setState(SyncState)
-
+		i.metrics.ErrorMessages.Add(1)
 		return
 	}
 
@@ -771,6 +774,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 	if hookErr := i.runHook(AcceptStateLogHook, i.state.view.Sequence, snap); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", AcceptStateLogHook, hookErr))
+		i.metrics.ErrorMessages.Add(1)
 	}
 
 	i.state.validators = snap.Set
@@ -788,6 +792,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 	if hookErr := i.runHook(CalculateProposerHook, i.state.view.Sequence, lastProposer); hookErr != nil {
 		i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", CalculateProposerHook, hookErr))
+		i.metrics.ErrorMessages.Add(1)
 	}
 
 	if i.state.proposer == i.validatorKeyAddr {
@@ -799,7 +804,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			if err != nil {
 				i.logger.Error("failed to build block", "err", err)
 				i.setState(RoundChangeState)
-
+				i.metrics.ErrorMessages.Add(1)
 				return
 			}
 
@@ -845,7 +850,7 @@ func (i *Ibft) runAcceptState() { // start new round
 
 		if msg.From != i.state.proposer.String() {
 			i.logger.Error("msg received from wrong proposer")
-
+			i.metrics.ErrorMessages.Add(1)
 			continue
 		}
 
@@ -854,7 +859,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		if err := block.UnmarshalRLP(msg.Proposal.Value); err != nil {
 			i.logger.Error("failed to unmarshal block", "err", err)
 			i.setState(RoundChangeState)
-
+			i.metrics.ErrorMessages.Add(1)
 			return
 		}
 
@@ -862,7 +867,7 @@ func (i *Ibft) runAcceptState() { // start new round
 		if block.Number() != i.state.view.Sequence {
 			i.logger.Error("sequence not correct", "block", block.Number, "sequence", i.state.view.Sequence)
 			i.handleStateErr(errIncorrectBlockHeight)
-
+			i.metrics.ErrorMessages.Add(1)
 			return
 		}
 
@@ -880,7 +885,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			if err := i.verifyHeaderImpl(snap, parent, block.Header); err != nil {
 				i.logger.Error("block header verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
-
+				i.metrics.ErrorMessages.Add(1)
 				continue
 			}
 
@@ -888,7 +893,7 @@ func (i *Ibft) runAcceptState() { // start new round
 			if err := i.blockchain.VerifyPotentialBlock(block); err != nil {
 				i.logger.Error("block verification failed", "err", err)
 				i.handleStateErr(errBlockVerificationFailed)
-
+				i.metrics.ErrorMessages.Add(1)
 				continue
 			}
 
@@ -899,7 +904,7 @@ func (i *Ibft) runAcceptState() { // start new round
 				} else {
 					i.logger.Error(fmt.Sprintf("Unable to run hook %s, %v", VerifyBlockHook, hookErr))
 				}
-
+				i.metrics.ErrorMessages.Add(1)
 				continue
 			}
 
@@ -979,6 +984,7 @@ func (i *Ibft) runValidateState() {
 			// be able to propose/validate a different block
 			i.logger.Error("failed to insert block", "err", err)
 			i.handleStateErr(errFailedToInsertBlock)
+			i.metrics.ErrorMessages.Add(1)
 		} else {
 			// update metrics
 			i.updateMetrics(block)
@@ -1006,6 +1012,17 @@ func (i *Ibft) updateMetrics(block *types.Block) {
 			headerTime.Sub(parentTime).Seconds(),
 		)
 	}
+	milliseconds := headerTime.Sub(parentTime).Milliseconds()
+	block_time := i.blockTime.Milliseconds()
+	if milliseconds < block_time+500 {
+		i.metrics.BlockLatencyBelow500ms.Add(1)
+	} else if milliseconds < block_time+1000 {
+		i.metrics.BlockLatencyBelow1s.Add(1)
+	} else if milliseconds < block_time+2000 {
+		i.metrics.BlockLatencyBelow2s.Add(1)
+	} else if milliseconds < block_time+3000 {
+		i.metrics.BlockLatencyBelow3s.Add(1)
+	}
 
 	//Update the Number of transactions in the block metric
 	i.metrics.NumTxs.Set(float64(len(block.Body().Transactions)))
@@ -1023,7 +1040,7 @@ func (i *Ibft) insertBlock(block *types.Block) error {
 					commit.From,
 				),
 			)
-
+			i.metrics.ErrorMessages.Add(1)
 			continue
 		}
 
@@ -1095,6 +1112,7 @@ func (i *Ibft) runRoundChangeState() {
 		i.state.cleanRound(round)
 		// send the round change message
 		i.sendRoundChange()
+		i.metrics.RoundChanges.Add(1)
 	}
 	sendNextRoundChange := func() {
 		sendRoundChange(i.state.view.Round + 1)
@@ -1210,7 +1228,7 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 		seal, err := writeCommittedSeal(i.validatorKey, i.state.block.Header)
 		if err != nil {
 			i.logger.Error("failed to commit seal", "err", err)
-
+			i.metrics.ErrorMessages.Add(1)
 			return
 		}
 
@@ -1226,12 +1244,13 @@ func (i *Ibft) gossip(typ proto.MessageReq_Type) {
 
 	if err := signMsg(i.validatorKey, msg); err != nil {
 		i.logger.Error("failed to sign message", "err", err)
-
+		i.metrics.ErrorMessages.Add(1)
 		return
 	}
 
 	if err := i.transport.Gossip(msg); err != nil {
 		i.logger.Error("failed to gossip", "err", err)
+		i.metrics.ErrorMessages.Add(1)
 	}
 }
 

@@ -257,7 +257,7 @@ func (p *TxPool) SetSigner(s signer) {
 func (p *TxPool) AddTx(tx *types.Transaction) error {
 	if err := p.addTx(local, tx); err != nil {
 		p.logger.Error("failed to add tx", "err", err)
-
+		p.metrics.ErrorMessages.Add(1)
 		return err
 	}
 
@@ -272,6 +272,7 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 
 		if err := p.topic.Publish(tx); err != nil {
 			p.logger.Error("failed to topic tx", "err", err)
+			p.metrics.ErrorMessages.Add(1)
 		}
 	}
 
@@ -448,7 +449,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		block, ok := p.store.GetBlockByHash(header.Hash, true)
 		if !ok {
 			p.logger.Error("could not find block in store", "hash", header.Hash.String())
-
+			p.metrics.ErrorMessages.Add(1)
 			continue
 		}
 
@@ -480,6 +481,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 	for _, tx := range oldTxs {
 		if err := p.addTx(reorg, tx); err != nil {
 			p.logger.Error("add tx", "err", err)
+			p.metrics.ErrorMessages.Add(1)
 		}
 	}
 
@@ -620,7 +622,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	// enqueue tx
 	if err := account.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err)
-
+		p.metrics.ErrorMessages.Add(1)
 		p.index.remove(tx)
 
 		return
@@ -667,14 +669,14 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 	raw, ok := obj.(*proto.Txn)
 	if !ok {
 		p.logger.Error("failed to cast gossiped message to txn")
-
+		p.metrics.ErrorMessages.Add(1)
 		return
 	}
 
 	// Verify that the gossiped transaction message is not empty
 	if raw == nil || raw.Raw == nil {
 		p.logger.Error("malformed gossip transaction message received")
-
+		p.metrics.ErrorMessages.Add(1)
 		return
 	}
 
@@ -683,7 +685,7 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 	// decode tx
 	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {
 		p.logger.Error("failed to decode broadcast tx", "err", err)
-
+		p.metrics.ErrorMessages.Add(1)
 		return
 	}
 
@@ -696,6 +698,7 @@ func (p *TxPool) addGossipTx(obj interface{}) {
 		}
 
 		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
+		p.metrics.ErrorMessages.Add(1)
 	}
 }
 

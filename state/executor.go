@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 
@@ -37,15 +38,17 @@ type Executor struct {
 	GetHash  GetHashByNumberHelper
 
 	PostHook func(txn *Transition)
+	metrics  *Metrics // Metrics for Prometheus
 }
 
 // NewExecutor creates a new executor
-func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
+func NewExecutor(config *chain.Params, s State, logger hclog.Logger, metrics *Metrics) *Executor {
 	return &Executor{
 		logger:   logger,
 		config:   config,
 		runtimes: []runtime.Runtime{},
 		state:    s,
+		metrics:  metrics,
 	}
 }
 
@@ -109,7 +112,15 @@ func (e *Executor) ProcessBlock(
 			continue
 		}
 
-		if err := txn.Write(t); err != nil {
+		start := time.Now()
+		err := txn.Write(t)
+		elapsed := time.Since(start)
+		if elapsed.Microseconds() > MaxTxExecPeriod {
+			e.metrics.TxnExceedPeriod.Add(1)
+		}
+
+		if err != nil {
+			e.metrics.ErrorMessages.Add(1)
 			return nil, err
 		}
 	}

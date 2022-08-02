@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -17,7 +18,7 @@ import (
 
 // setupSnapshot sets up the snapshot store for the IBFT object
 func (i *Ibft) setupSnapshot() error {
-	i.store = newSnapshotStore()
+	i.store = newSnapshotStore(i.metrics)
 
 	// Read from storage
 	if i.config.Path != "" {
@@ -357,12 +358,15 @@ type snapshotStore struct {
 
 	// list represents the actual snapshot sorted list
 	list snapshotSortedList
+
+	metrics *consensus.Metrics
 }
 
 // newSnapshotStore returns a new snapshot store
-func newSnapshotStore() *snapshotStore {
+func newSnapshotStore(m *consensus.Metrics) *snapshotStore {
 	return &snapshotStore{
-		list: snapshotSortedList{},
+		list:    snapshotSortedList{},
+		metrics: m,
 	}
 }
 
@@ -376,6 +380,7 @@ func (s *snapshotStore) loadFromPath(path string, l hclog.Logger) error {
 		l.Error("Could not read metadata snapshot store file", "err", err.Error())
 		os.Remove(filepath.Join(path, "metadata"))
 		l.Error("Removed invalid metadata snapshot store file")
+		s.metrics.ErrorMessages.Add(2)
 	}
 
 	if meta != nil {
@@ -390,6 +395,7 @@ func (s *snapshotStore) loadFromPath(path string, l hclog.Logger) error {
 		l.Error("Could not read snapshot store file", "err", err.Error())
 		os.Remove(filepath.Join(path, "snapshots"))
 		l.Error("Removed invalid snapshot store file")
+		s.metrics.ErrorMessages.Add(2)
 	}
 
 	for _, snap := range snaps {

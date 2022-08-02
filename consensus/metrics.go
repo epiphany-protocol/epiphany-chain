@@ -18,6 +18,24 @@ type Metrics struct {
 
 	//Time between current block and the previous block in seconds
 	BlockInterval metrics.Gauge
+
+	//Blocks latency below 500ms
+	BlockLatencyBelow500ms metrics.Counter
+
+	//Blocks latency below 1s
+	BlockLatencyBelow1s metrics.Counter
+
+	//Blocks latency below 2s
+	BlockLatencyBelow2s metrics.Counter
+
+	//Blocks latency below 3s
+	BlockLatencyBelow3s metrics.Counter
+
+	//Round changes
+	RoundChanges metrics.Counter
+
+	//Error Messages occured
+	ErrorMessages metrics.Counter
 }
 
 // GetPrometheusMetrics return the consensus metrics instance
@@ -54,15 +72,63 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 			Name:      "block_interval",
 			Help:      "Time between current block and the previous block in seconds.",
 		}, labels).With(labelsWithValues...),
+
+		BlockLatencyBelow500ms: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "consensus",
+			Name:      "block_latency_below_500ms",
+			Help:      "Blocks latency below 500ms.",
+		}, labels).With(labelsWithValues...),
+
+		BlockLatencyBelow1s: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "consensus",
+			Name:      "block_latency_below_1s",
+			Help:      "Blocks latency below 1s.",
+		}, labels).With(labelsWithValues...),
+
+		BlockLatencyBelow2s: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "consensus",
+			Name:      "block_latency_below_2s",
+			Help:      "Blocks latency below 2s.",
+		}, labels).With(labelsWithValues...),
+
+		BlockLatencyBelow3s: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "consensus",
+			Name:      "block_latency_below_3s",
+			Help:      "Blocks latency below 3s.",
+		}, labels).With(labelsWithValues...),
+
+		RoundChanges: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "consensus",
+			Name:      "round_changes",
+			Help:      "Round Changes.",
+		}, labels).With(labelsWithValues...),
+
+		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "consensus",
+			Name:      "error_messages",
+			Help:      "Error Messages occured.",
+		}, labels).With(labelsWithValues...),
 	}
 }
 
 // NilMetrics will return the non operational metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
-		Validators:    discard.NewGauge(),
-		Rounds:        discard.NewGauge(),
-		NumTxs:        discard.NewGauge(),
-		BlockInterval: discard.NewGauge(),
+		Validators:             discard.NewGauge(),
+		Rounds:                 discard.NewGauge(),
+		NumTxs:                 discard.NewGauge(),
+		BlockInterval:          discard.NewGauge(),
+		BlockLatencyBelow500ms: discard.NewCounter(),
+		BlockLatencyBelow1s:    discard.NewCounter(),
+		BlockLatencyBelow2s:    discard.NewCounter(),
+		BlockLatencyBelow3s:    discard.NewCounter(),
+		RoundChanges:           discard.NewCounter(),
+		ErrorMessages:          discard.NewCounter(),
 	}
 }

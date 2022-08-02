@@ -2,8 +2,9 @@ package server
 
 import (
 	"errors"
-	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"net"
+
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -35,6 +36,7 @@ const (
 	devFlag               = "dev"
 	corsOriginFlag        = "access-control-allow-origins"
 	logFileLocationFlag   = "log-to"
+	monitorEnabled        = "monitor-enabled"
 )
 
 const (
@@ -77,6 +79,8 @@ type serverParams struct {
 	secretsConfig *secrets.SecretsManagerConfig
 
 	logFileLocation string
+
+	monitorEnabled bool
 }
 
 func (p *serverParams) validateFlags() error {
@@ -115,6 +119,10 @@ func (p *serverParams) isDNSAddressSet() bool {
 
 func (p *serverParams) isLogFileLocationSet() bool {
 	return p.rawConfig.LogFilePath != ""
+}
+
+func (p *serverParams) isMonitorEnabled() bool {
+	return p.rawConfig.MonitorEnabled
 }
 
 func (p *serverParams) isDevConsensus() bool {
@@ -169,5 +177,6 @@ func (p *serverParams) generateConfig() *server.Config {
 		BlockTime:      p.rawConfig.BlockTime,
 		LogLevel:       hclog.LevelFromString(p.rawConfig.LogLevel),
 		LogFilePath:    p.logFileLocation,
+		MonitorEnabled: p.monitorEnabled,
 	}
 }

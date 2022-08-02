@@ -1,4 +1,4 @@
-package txpool
+package protocol
 
 import (
 	"github.com/go-kit/kit/metrics"
@@ -7,16 +7,16 @@ import (
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )
 
-// Metrics represents the txpool metrics
+// Metrics represents the consensus metrics
 type Metrics struct {
-	// Pending transactions
-	PendingTxs metrics.Gauge
+	//JSONRPC calls
+	BlockEclapsed metrics.Gauge
 
 	//Error Messages occured
 	ErrorMessages metrics.Counter
 }
 
-// GetPrometheusMetrics return the txpool metrics instance
+// GetPrometheusMetrics return the consensus metrics instance
 func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics {
 	labels := []string{}
 
@@ -25,25 +25,25 @@ func GetPrometheusMetrics(namespace string, labelsWithValues ...string) *Metrics
 	}
 
 	return &Metrics{
-		PendingTxs: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
+		BlockEclapsed: prometheus.NewGaugeFrom(stdprometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: "txpool",
-			Name:      "pending_transactions",
-			Help:      "Pending transactions in the pool",
+			Subsystem: "protocol",
+			Name:      "block_eclapsed",
+			Help:      "Time eclapsed from block creation to received.",
 		}, labels).With(labelsWithValues...),
 		ErrorMessages: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: "txpool",
+			Subsystem: "protocol",
 			Name:      "error_messages",
 			Help:      "Error Messages occured.",
 		}, labels).With(labelsWithValues...),
 	}
 }
 
-// NilMetrics will return the non operational txpool metrics
+// NilMetrics will return the non operational metrics
 func NilMetrics() *Metrics {
 	return &Metrics{
-		PendingTxs:    discard.NewGauge(),
+		BlockEclapsed: discard.NewGauge(),
 		ErrorMessages: discard.NewCounter(),
 	}
 }

@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/0xPolygon/polygon-edge/network/common"
 	"github.com/0xPolygon/polygon-edge/network/dial"
 	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/p2p/security/noise"
 	rawGrpc "google.golang.org/grpc"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	peerEvent "github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -66,7 +67,8 @@ type Server struct {
 	peers     map[peer.ID]*PeerConnInfo // map of all peer connections
 	peersLock sync.Mutex                // lock for the peer map
 
-	metrics *Metrics // reference for metrics tracking
+	metrics          *Metrics // reference for metrics tracking
+	discoveryMertics *discovery.Metrics
 
 	dialQueue *dial.DialQueue // queue used to asynchronously connect to peers
 
@@ -139,6 +141,7 @@ func NewServer(logger hclog.Logger, config *Config) (*Server, error) {
 		addrs:            host.Addrs(),
 		peers:            make(map[peer.ID]*PeerConnInfo),
 		metrics:          config.Metrics,
+		discoveryMertics: config.DiscoveryMetrics,
 		dialQueue:        dial.NewDialQueue(),
 		closeCh:          make(chan struct{}),
 		emitterPeerEvent: emitter,
@@ -370,6 +373,7 @@ func (s *Server) runDial() {
 			"err",
 			err,
 		)
+		s.metrics.ErrorMessages.Add(1)
 
 		// Failing to subscribe to network events is fatal since the
 		// dial manager relies on the event subscription routine to function
@@ -529,6 +533,7 @@ func (s *Server) DisconnectFromPeer(peer peer.ID, reason string) {
 
 		if closeErr := s.host.Network().ClosePeer(peer); closeErr != nil {
 			s.logger.Error(fmt.Sprintf("Unable to gracefully close peer connection, %v", closeErr))
+			s.metrics.ErrorMessages.Add(1)
 		}
 	}
 }

@@ -56,7 +56,7 @@ func testVMCase(t *testing.T, name string, c *VMCase) {
 
 	config := mainnetChainConfig.Forks.At(uint64(env.Number))
 
-	executor := state.NewExecutor(&mainnetChainConfig, s, hclog.NewNullLogger())
+	executor := state.NewExecutor(&mainnetChainConfig, s, hclog.NewNullLogger(), state.NilMetrics())
 	executor.GetHash = func(*types.Header) func(i uint64) types.Hash {
 		return vmTestBlockHash
 	}

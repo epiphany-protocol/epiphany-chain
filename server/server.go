@@ -159,6 +159,7 @@ func NewServer(config *Config) (*Server, error) {
 		netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
 		netConfig.SecretsManager = m.secretsManager
 		netConfig.Metrics = m.serverMetrics.network
+		netConfig.DiscoveryMetrics = m.serverMetrics.discovery
 
 		network, err := network.NewServer(logger, netConfig)
 		if err != nil {
@@ -178,7 +179,7 @@ func NewServer(config *Config) (*Server, error) {
 	st := itrie.NewState(stateStorage)
 	m.state = st
 
-	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
+	m.executor = state.NewExecutor(config.Chain.Params, st, logger, m.serverMetrics.state)
 	m.executor.SetRuntime(precompiled.NewPrecompiled())
 	m.executor.SetRuntime(evm.NewEVM())
 
@@ -187,7 +188,7 @@ func NewServer(config *Config) (*Server, error) {
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor)
+	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, m.serverMetrics.blockchain, config.MonitorEnabled)
 	if err != nil {
 		return nil, err
 	}
@@ -393,18 +394,19 @@ func (s *Server) setupConsensus() error {
 
 	consensus, err := engine(
 		&consensus.ConsensusParams{
-			Context:        context.Background(),
-			Seal:           s.config.Seal,
-			Config:         config,
-			Txpool:         s.txpool,
-			Network:        s.network,
-			Blockchain:     s.blockchain,
-			Executor:       s.executor,
-			Grpc:           s.grpcServer,
-			Logger:         s.logger.Named("consensus"),
-			Metrics:        s.serverMetrics.consensus,
-			SecretsManager: s.secretsManager,
-			BlockTime:      s.config.BlockTime,
+			Context:         context.Background(),
+			Seal:            s.config.Seal,
+			Config:          config,
+			Txpool:          s.txpool,
+			Network:         s.network,
+			Blockchain:      s.blockchain,
+			Executor:        s.executor,
+			Grpc:            s.grpcServer,
+			Logger:          s.logger.Named("consensus"),
+			Metrics:         s.serverMetrics.consensus,
+			SecretsManager:  s.secretsManager,
+			BlockTime:       s.config.BlockTime,
+			ProtocolMetrics: s.serverMetrics.protocol,
 		},
 	)
 
@@ -552,7 +554,7 @@ func (s *Server) setupJSONRPC() error {
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
 	}
 
-	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
+	srv, err := jsonrpc.NewJSONRPC(s.logger, conf, s.serverMetrics.jsonrpc)
 	if err != nil {
 		return err
 	}
@@ -574,6 +576,7 @@ func (s *Server) setupGRPC() error {
 	go func() {
 		if err := s.grpcServer.Serve(lis); err != nil {
 			s.logger.Error(err.Error())
+			s.serverMetrics.server.ErrorMessages.Add(1)
 		}
 	}()
 
@@ -597,26 +600,31 @@ func (s *Server) Close() {
 	// Close the blockchain layer
 	if err := s.blockchain.Close(); err != nil {
 		s.logger.Error("failed to close blockchain", "err", err.Error())
+		s.serverMetrics.server.ErrorMessages.Add(1)
 	}
 
 	// Close the networking layer
 	if err := s.network.Close(); err != nil {
 		s.logger.Error("failed to close networking", "err", err.Error())
+		s.serverMetrics.server.ErrorMessages.Add(1)
 	}
 
 	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
 		s.logger.Error("failed to close consensus", "err", err.Error())
+		s.serverMetrics.server.ErrorMessages.Add(1)
 	}
 
 	// Close the state storage
 	if err := s.stateStorage.Close(); err != nil {
 		s.logger.Error("failed to close storage for trie", "err", err.Error())
+		s.serverMetrics.server.ErrorMessages.Add(1)
 	}
 
 	if s.prometheusServer != nil {
 		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {
 			s.logger.Error("Prometheus server shutdown error", err)
+			s.serverMetrics.server.ErrorMessages.Add(1)
 		}
 	}
 
@@ -646,6 +654,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+			s.serverMetrics.server.ErrorMessages.Add(1)
 		}
 	}()
 

@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
+	"github.com/0xPolygon/polygon-edge/protocol"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -60,18 +61,19 @@ type Config struct {
 }
 
 type ConsensusParams struct {
-	Context        context.Context
-	Seal           bool
-	Config         *Config
-	Txpool         *txpool.TxPool
-	Network        *network.Server
-	Blockchain     *blockchain.Blockchain
-	Executor       *state.Executor
-	Grpc           *grpc.Server
-	Logger         hclog.Logger
-	Metrics        *Metrics
-	SecretsManager secrets.SecretsManager
-	BlockTime      uint64
+	Context         context.Context
+	Seal            bool
+	Config          *Config
+	Txpool          *txpool.TxPool
+	Network         *network.Server
+	Blockchain      *blockchain.Blockchain
+	Executor        *state.Executor
+	Grpc            *grpc.Server
+	Logger          hclog.Logger
+	Metrics         *Metrics
+	SecretsManager  secrets.SecretsManager
+	BlockTime       uint64
+	ProtocolMetrics *protocol.Metrics
 }
 
 // Factory is the factory function to create a discovery backend

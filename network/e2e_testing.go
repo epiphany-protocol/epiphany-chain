@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/network/discovery"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/hashicorp/go-hclog"
@@ -240,6 +241,7 @@ func CreateServer(params *CreateServerParams) (*Server, error) {
 
 	cfg.SecretsManager = secretsManager
 	cfg.Metrics = NilMetrics()
+	cfg.DiscoveryMetrics = discovery.NilMetrics()
 
 	server, err := NewServer(params.Logger, cfg)
 	if err != nil {

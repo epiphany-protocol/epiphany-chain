@@ -3,9 +3,10 @@ package server
 import (
 	"errors"
 	"fmt"
-	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"math"
 	"net"
+
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 
 	"github.com/0xPolygon/polygon-edge/network/common"
 
@@ -59,6 +60,7 @@ func (p *serverParams) initRawParams() error {
 
 	p.initPeerLimits()
 	p.initLogFileLocation()
+	p.initMonitorEnabled()
 
 	return p.initAddresses()
 }
@@ -83,6 +85,10 @@ func (p *serverParams) initLogFileLocation() {
 	if p.isLogFileLocationSet() {
 		p.logFileLocation = p.rawConfig.LogFilePath
 	}
+}
+
+func (p *serverParams) initMonitorEnabled() {
+	p.monitorEnabled = p.rawConfig.MonitorEnabled
 }
 
 func (p *serverParams) initBlockGasTarget() error {

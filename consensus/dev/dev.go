@@ -26,6 +26,7 @@ type Dev struct {
 
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
+	metrics    *consensus.Metrics
 }
 
 // Factory implements the base factory method
@@ -41,6 +42,7 @@ func Factory(
 		blockchain: params.Blockchain,
 		executor:   params.Executor,
 		txpool:     params.Txpool,
+		metrics:    params.Metrics,
 	}
 
 	rawInterval, ok := params.Config.Config["interval"]
@@ -96,6 +98,7 @@ func (d *Dev) run() {
 		header := d.blockchain.Header()
 		if err := d.writeNewBlock(header); err != nil {
 			d.logger.Error("failed to mine block", "err", err)
+			d.metrics.ErrorMessages.Add(1)
 		}
 	}
 }
@@ -122,6 +125,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 		}
 
 		if err := transition.Write(tx); err != nil {
+			d.metrics.ErrorMessages.Add(1)
 			if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { // nolint:errorlint
 				break
 			} else if appErr, ok := err.(*state.TransitionApplicationError); ok && appErr.IsRecoverable { // nolint:errorlint
